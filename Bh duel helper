@@ -1,0 +1,375 @@
+-- [[ DEOBFUSCATED BY @Casual ]] --
+
+-- // [1] SERVICES //
+
+local Players      = game:GetService("Players")
+local CoreGui      = game:GetService("CoreGui")
+local Lighting     = game:GetService("Lighting")
+local RunService   = game:GetService("RunService")
+local HttpService  = game:GetService("HttpService")
+
+local LocalPlayer  = Players.LocalPlayer
+local Camera       = workspace.CurrentCamera
+
+-- // [2] CONFIGURATION //
+
+local CONFIG = {
+
+    Names = {
+        ScreenGui  = "BhHubSystem",
+        MainFrame  = "MainFrame",
+        TitleLabel = "TitleLabel",
+    },
+
+    Size = {
+        MainFrame = UDim2.new(0, 160, 0, 220),
+        Button    = UDim2.new(0.85, 0, 0, 28),
+    },
+
+    Position = {
+        MainFrame = UDim2.new(0.5, -80, 0.3, 0),
+    },
+
+    Colors = {
+        MainFrame      = Color3.fromRGB(0, 0, 0),
+        ButtonOff      = Color3.fromRGB(40, 0, 0),
+        ButtonOn       = Color3.fromRGB(200, 0, 0),
+        ButtonSave     = Color3.fromRGB(120, 0, 0),
+        Text           = Color3.fromRGB(255, 80, 80),
+        Stroke         = Color3.fromRGB(255, 80, 80),
+    },
+
+    Corner = {
+        Frame  = UDim.new(0, 10),
+        Button = UDim.new(0, 6),
+    },
+
+    Title     = "BH HUB DUELS HELPER",
+    TitleSize = 14,
+    ButtonTextSize = 13,
+    Font = Enum.Font.LuckiestGuy,
+
+    ButtonPositions = {
+        UDim2.new(0.075, 0, 0.18, 0),
+        UDim2.new(0.075, 0, 0.33, 0),
+        UDim2.new(0.075, 0, 0.48, 0),
+        UDim2.new(0.075, 0, 0.63, 0),
+        UDim2.new(0.075, 0, 0.82, 0),
+    },
+
+    GalaxySky = {
+        Bk = "rbxassetid://159454299",
+        Dn = "rbxassetid://159454296",
+        Ft = "rbxassetid://159454293",
+        Lf = "rbxassetid://159454286",
+        Rt = "rbxassetid://159454289",
+        Up = "rbxassetid://159454291",
+    },
+
+    DefaultLighting = {
+        Brightness          = 2,
+        ClockTime           = 4.981111,
+        ExposureCompensation = 0,
+        OutdoorAmbient      = Color3.fromRGB(212, 212, 212),
+    },
+
+    FOV = {
+        On  = 100,
+        Off = 70,
+    },
+
+}
+
+-- // [3] OBJECT REFERENCES //
+
+local ScreenGui   = nil
+local MainFrame   = nil
+local TitleLabel  = nil
+local Buttons     = {}
+
+local State = {
+    FOV        = false,
+    GalaxyMode = false,
+    AntiBat    = false,
+    AntiFling  = false,
+}
+
+local Connections = {
+    AntiBat   = nil,
+    AntiFling = nil,
+}
+
+-- // [4] UTILITY FUNCTIONS //
+
+local function getCharacter()
+    return LocalPlayer.Character
+end
+
+local function getHRP()
+    local char = getCharacter()
+    if not char then return nil end
+    return char:FindFirstChild("HumanoidRootPart")
+        or char:FindFirstChild("UpperTorso")
+end
+
+local function getHumanoid()
+    local char = getCharacter()
+    if not char then return nil end
+    return char:FindFirstChildOfClass("Humanoid")
+end
+
+local function getNearestOpponent()
+    local myHRP = getHRP()
+    if not myHRP then return nil end
+
+    local nearest, nearestDist = nil, math.huge
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local char = player.Character
+            if char then
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local dist = (hrp.Position - myHRP.Position).Magnitude
+                    if dist < nearestDist then
+                        nearestDist = dist
+                        nearest = hrp
+                    end
+                end
+            end
+        end
+    end
+
+    return nearest
+end
+
+local function setButtonState(btn, on, labelOn, labelOff)
+    btn.Text = on and labelOn or labelOff
+    btn.BackgroundColor3 = on
+        and CONFIG.Colors.ButtonOn
+        or  CONFIG.Colors.ButtonOff
+end
+
+-- // [5] GUI CREATION //
+
+local function createGUI()
+
+    local existing = CoreGui:FindFirstChild(CONFIG.Names.ScreenGui)
+    if existing then existing:Destroy() end
+
+    ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = CONFIG.Names.ScreenGui
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.Parent = CoreGui
+
+    MainFrame = Instance.new("Frame")
+    MainFrame.Name = CONFIG.Names.MainFrame
+    MainFrame.Size = CONFIG.Size.MainFrame
+    MainFrame.Position = CONFIG.Position.MainFrame
+    MainFrame.BackgroundColor3 = CONFIG.Colors.MainFrame
+    MainFrame.Active = true
+    MainFrame.Draggable = true
+    MainFrame.Parent = ScreenGui
+
+    local frameCorner = Instance.new("UICorner")
+    frameCorner.CornerRadius = CONFIG.Corner.Frame
+    frameCorner.Parent = MainFrame
+
+    local frameStroke = Instance.new("UIStroke")
+    frameStroke.Color = CONFIG.Colors.Stroke
+    frameStroke.Parent = MainFrame
+
+    TitleLabel = Instance.new("TextLabel")
+    TitleLabel.Name = CONFIG.Names.TitleLabel
+    TitleLabel.Size = UDim2.new(1, 0, 0, 35)
+    TitleLabel.Position = UDim2.new(0, 0, 0, 2)
+    TitleLabel.BackgroundTransparency = 1
+    TitleLabel.Text = CONFIG.Title
+    TitleLabel.TextColor3 = CONFIG.Colors.Text
+    TitleLabel.TextSize = CONFIG.TitleSize
+    TitleLabel.Font = CONFIG.Font
+    TitleLabel.Parent = MainFrame
+
+    local buttonDefs = {
+        { label = "FOV: OFF",          save = false },
+        { label = "GALAXY MODE: OFF",  save = false },
+        { label = "ANTI BAT: OFF",     save = false },
+        { label = "ANTI-FLING: OFF",   save = false },
+        { label = "SAVE CONFIG",       save = true  },
+    }
+
+    for i, def in ipairs(buttonDefs) do
+        local btn = Instance.new("TextButton")
+        btn.Name = "Button_" .. i
+        btn.Size = CONFIG.Size.Button
+        btn.Position = CONFIG.ButtonPositions[i]
+        btn.BackgroundColor3 = def.save
+            and CONFIG.Colors.ButtonSave
+            or  CONFIG.Colors.ButtonOff
+        btn.Text = def.label
+        btn.TextColor3 = CONFIG.Colors.Text
+        btn.Font = CONFIG.Font
+        btn.TextSize = CONFIG.ButtonTextSize
+        btn.Parent = MainFrame
+
+        local btnCorner = Instance.new("UICorner")
+        btnCorner.CornerRadius = CONFIG.Corner.Button
+        btnCorner.Parent = btn
+
+        Buttons[i] = btn
+    end
+
+end
+
+-- // [6] FUNCTIONALITY //
+
+local ButtonFunctions = {}
+
+ButtonFunctions[1] = function()
+    State.FOV = not State.FOV
+    if State.FOV then
+        Camera.FieldOfView = CONFIG.FOV.On
+        setButtonState(Buttons[1], true, "FOV: ON", "FOV: OFF")
+    else
+        Camera.FieldOfView = CONFIG.FOV.Off
+        setButtonState(Buttons[1], false, "FOV: ON", "FOV: OFF")
+    end
+end
+
+ButtonFunctions[2] = function()
+    State.GalaxyMode = not State.GalaxyMode
+    if State.GalaxyMode then
+        if not Lighting:FindFirstChild("GalaxySky") then
+            local sky = Instance.new("Sky")
+            sky.Name       = "GalaxySky"
+            sky.SkyboxBk   = CONFIG.GalaxySky.Bk
+            sky.SkyboxDn   = CONFIG.GalaxySky.Dn
+            sky.SkyboxFt   = CONFIG.GalaxySky.Ft
+            sky.SkyboxLf   = CONFIG.GalaxySky.Lf
+            sky.SkyboxRt   = CONFIG.GalaxySky.Rt
+            sky.SkyboxUp   = CONFIG.GalaxySky.Up
+            sky.Parent     = Lighting
+        end
+        Lighting.Brightness           = 0
+        Lighting.ClockTime            = 0
+        Lighting.ExposureCompensation = -2
+        Lighting.OutdoorAmbient       = Color3.new(0, 0, 0)
+        setButtonState(Buttons[2], true, "GALAXY MODE: ON", "GALAXY MODE: OFF")
+    else
+        local sky = Lighting:FindFirstChild("GalaxySky")
+        if sky then sky:Destroy() end
+        Lighting.Brightness           = CONFIG.DefaultLighting.Brightness
+        Lighting.ClockTime            = CONFIG.DefaultLighting.ClockTime
+        Lighting.ExposureCompensation = CONFIG.DefaultLighting.ExposureCompensation
+        Lighting.OutdoorAmbient       = CONFIG.DefaultLighting.OutdoorAmbient
+        setButtonState(Buttons[2], false, "GALAXY MODE: ON", "GALAXY MODE: OFF")
+    end
+end
+
+ButtonFunctions[3] = function()
+    State.AntiBat = not State.AntiBat
+    if State.AntiBat then
+        setButtonState(Buttons[3], true, "ANTI BAT: ON", "ANTI BAT: OFF")
+        Connections.AntiBat = RunService.Heartbeat:Connect(function()
+            local hrp = getHRP()
+            if not hrp then return end
+            local opponentHRP = getNearestOpponent()
+            if not opponentHRP then return end
+            local opponentChar = opponentHRP.Parent
+            local tool = opponentChar and opponentChar:FindFirstChildOfClass("Tool")
+            local batEquipped = tool and tool.Name == "Bat"
+            if batEquipped then
+                if not hrp:FindFirstChild("BhForce") then
+                    local bav = Instance.new("BodyAngularVelocity")
+                    bav.Name            = "BhForce"
+                    bav.MaxTorque       = Vector3.new(0, math.huge, 0)
+                    bav.AngularVelocity = Vector3.new(0, 50, 0)
+                    bav.Parent          = hrp
+                    local hum = getHumanoid()
+                    if hum then hum.AutoRotate = false end
+                end
+            else
+                local force = hrp:FindFirstChild("BhForce")
+                if force then
+                    force:Destroy()
+                    local hum = getHumanoid()
+                    if hum then hum.AutoRotate = true end
+                end
+            end
+        end)
+    else
+        if Connections.AntiBat then
+            Connections.AntiBat:Disconnect()
+            Connections.AntiBat = nil
+        end
+        local hrp = getHRP()
+        if hrp then
+            local force = hrp:FindFirstChild("BhForce")
+            if force then force:Destroy() end
+        end
+        local hum = getHumanoid()
+        if hum then hum.AutoRotate = true end
+        setButtonState(Buttons[3], false, "ANTI BAT: ON", "ANTI BAT: OFF")
+    end
+end
+
+ButtonFunctions[4] = function()
+    State.AntiFling = not State.AntiFling
+    if State.AntiFling then
+        setButtonState(Buttons[4], true, "ANTI-FLING: ON", "ANTI-FLING: OFF")
+        Connections.AntiFling = RunService.Heartbeat:Connect(function()
+            local char = getCharacter()
+            if not char then return end
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end)
+    else
+        if Connections.AntiFling then
+            Connections.AntiFling:Disconnect()
+            Connections.AntiFling = nil
+        end
+        setButtonState(Buttons[4], false, "ANTI-FLING: ON", "ANTI-FLING: OFF")
+    end
+end
+
+ButtonFunctions[5] = function()
+    local saveData = {
+        position   = tostring(MainFrame.Position),
+        fov        = State.FOV,
+        galaxyMode = State.GalaxyMode,
+        antiBat    = State.AntiBat,
+        antiFling  = State.AntiFling,
+    }
+    pcall(function()
+        HttpService:JSONEncode(saveData)
+    end)
+    local originalText = Buttons[5].Text
+    Buttons[5].Text = "SAVED!"
+    task.delay(1.5, function()
+        if Buttons[5] then
+            Buttons[5].Text = originalText
+        end
+    end)
+end
+
+local function connectButtons()
+    for i, btn in ipairs(Buttons) do
+        btn.MouseButton1Click:Connect(function()
+            if ButtonFunctions[i] then
+                ButtonFunctions[i]()
+            end
+        end)
+    end
+end
+
+-- // [7] INITIALIZATION //
+
+local function init()
+    createGUI()
+    connectButtons()
+end
+
+init()
